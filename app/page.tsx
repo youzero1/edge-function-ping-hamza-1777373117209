@@ -81,18 +81,48 @@ export default function HomePage() {
     setEdgeLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('hello', {
-        body: { test: true },
+      // Get the current session to obtain the access token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      if (!accessToken) {
+        setEdgeError('No active session. Please sign in again.');
+        setEdgeLoading(false);
+        return;
+      }
+
+      // Use raw fetch to avoid the supabase-js Relay/CORS issues
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        setEdgeError('Missing Supabase environment variables.');
+        setEdgeLoading(false);
+        return;
+      }
+
+      const functionUrl = `${supabaseUrl}/functions/v1/hello`;
+
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({ test: true }),
       });
 
-      if (error) {
-        setEdgeError(typeof error === 'object' && error !== null && 'message' in error ? (error as { message: string }).message : JSON.stringify(error));
+      const data = await response.json();
+
+      if (!response.ok) {
+        setEdgeError(data?.error || `HTTP ${response.status}: ${response.statusText}`);
       } else {
         setEdgeResult(JSON.stringify(data, null, 2));
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setEdgeError(err.message);
+        setEdgeError(`Failed to call Edge Function: ${err.message}`);
       } else {
         setEdgeError('An unexpected error occurred calling the edge function');
       }

@@ -11,12 +11,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.10'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
 serve(async (req: Request) => {
-  // Handle CORS preflight
+  // Handle CORS preflight — must return 200 with all CORS headers
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    })
   }
 
   try {
