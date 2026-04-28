@@ -15,6 +15,7 @@ export default function HomePage() {
   const [edgeError, setEdgeError] = useState<string | null>(null);
   const [edgeLoading, setEdgeLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [deployInfo, setDeployInfo] = useState(false);
 
   const missingEnv = !supabase;
 
@@ -91,7 +92,8 @@ export default function HomePage() {
         return;
       }
 
-      // Use raw fetch to avoid the supabase-js Relay/CORS issues
+      // Use raw fetch to call the edge function directly
+      // This avoids any supabase-js relay/proxy issues
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -113,6 +115,26 @@ export default function HomePage() {
         body: JSON.stringify({ test: true }),
       });
 
+      // Check if we got a non-JSON response (e.g. HTML error page)
+      const contentType = response.headers.get('content-type') || '';
+
+      if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        if (response.status === 404) {
+          setEdgeError(
+            'Edge Function "hello" not found (404). You need to deploy it first. ' +
+            'See the deployment instructions below.'
+          );
+          setDeployInfo(true);
+        } else {
+          setEdgeError(
+            `Unexpected response (HTTP ${response.status}): ${text.substring(0, 200)}`
+          );
+        }
+        setEdgeLoading(false);
+        return;
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -121,7 +143,14 @@ export default function HomePage() {
         setEdgeResult(JSON.stringify(data, null, 2));
       }
     } catch (err: unknown) {
-      if (err instanceof Error) {
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setEdgeError(
+          'Network error calling Edge Function. This is usually a CORS issue. ' +
+          'Make sure the Edge Function is deployed and includes proper CORS headers. ' +
+          'See deployment instructions below.'
+        );
+        setDeployInfo(true);
+      } else if (err instanceof Error) {
         setEdgeError(`Failed to call Edge Function: ${err.message}`);
       } else {
         setEdgeError('An unexpected error occurred calling the edge function');
@@ -312,6 +341,34 @@ export default function HomePage() {
                   </pre>
                 </div>
               )}
+            </div>
+
+            {/* Deploy instructions — always visible, highlighted if error occurred */}
+            <div className={`rounded-xl border p-5 transition-colors ${
+              deployInfo
+                ? 'border-amber-600/50 bg-amber-950/20'
+                : 'border-gray-800/60 bg-gray-900/30'
+            }`}>
+              <h3 className={`text-sm font-semibold mb-2 ${
+                deployInfo ? 'text-amber-400' : 'text-gray-400'
+              }`}>
+                {deployInfo ? '⚠️ Edge Function Not Deployed' : '📋 Edge Function Deployment'}
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed mb-3">
+                The Edge Function <code className="bg-gray-800 px-1 rounded text-emerald-400">hello</code> must
+                be deployed to your Supabase project. The build pipeline does <strong>not</strong> deploy Edge Functions automatically.
+              </p>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-300">Option A — Supabase CLI:</p>
+                <pre className="text-xs bg-gray-800 rounded-lg px-3 py-2 text-gray-300 overflow-x-auto">{`supabase functions deploy hello --project-ref <your-ref>`}</pre>
+                <p className="text-xs font-medium text-gray-300 mt-2">Option B — Supabase Dashboard:</p>
+                <ol className="text-xs text-gray-400 list-decimal list-inside space-y-1">
+                  <li>Go to your Supabase project → <strong>Edge Functions</strong></li>
+                  <li>Click <strong>Create a new function</strong>, name it <code className="bg-gray-800 px-1 rounded">hello</code></li>
+                  <li>Paste the contents of <code className="bg-gray-800 px-1 rounded">supabase/functions/hello/index.ts</code></li>
+                  <li>Deploy &amp; verify the function URL is <code className="bg-gray-800 px-1 rounded">{`<your-project>.supabase.co/functions/v1/hello`}</code></li>
+                </ol>
+              </div>
             </div>
 
             {/* Network hint */}

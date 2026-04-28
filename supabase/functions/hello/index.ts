@@ -1,9 +1,17 @@
 // Supabase Edge Function: hello
-// Deploy with: supabase functions deploy hello
 //
-// This function requires an authenticated user.
-// It reads the JWT from the Authorization header,
-// verifies it via Supabase Auth, and returns a JSON response.
+// ⚠️  YOU MUST DEPLOY THIS YOURSELF — the build pipeline does NOT deploy Edge Functions.
+//
+// Option A – Supabase CLI:
+//   supabase functions deploy hello --project-ref <your-project-ref>
+//
+// Option B – Supabase Dashboard:
+//   1. Go to your project → Edge Functions → Create a new function
+//   2. Name it "hello"
+//   3. Paste this entire file as the function body
+//   4. Deploy
+//
+// The function requires an authenticated user (JWT via Authorization header).
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.10'
